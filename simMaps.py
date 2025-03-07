@@ -11,14 +11,10 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import mpl_toolkits.axes_grid1 as axgrid
 
-def load_tng(filename,line='Lya'):
-    if 'Lya' in line:
-        restwave = 1215.67 * u.AA
-    elif 'OVI' in line: 
-        restwave = 1031.93 * u.AA
-    elif 'CIII' in line:
-        restwave = 977.02 * u.AA
+from hwo_cgm import utils as hcu
 
+def load_tng(filename,line='Lya'):
+    restwave = hcu.get_restwave(line)
     with h5py.File(filename,'r') as ff:
         grid = ff['grid']
         data = grid[()]
@@ -32,13 +28,14 @@ def load_tng(filename,line='Lya'):
     return datadict
 
 def make_map(dataarr,line='Lya',units='cgs',cmap=cm.inferno,vmin=-21,
-             extent=600.*u.kpc,axislabels='distance',numticks=5):
+             vmax=-15,extent=600.*u.kpc,axislabels='distance',numticks=5):
 
-    fig, ax1 = plt.subplots(1, 1, figsize=(13, 10))
+    fig, ax1 = plt.subplots(1, 1, figsize=(11.5, 10))
+    fig.subplots_adjust(bottom=0.1,top=0.95,left=0.1)
     colmap=matplotlib.cm.inferno
 
     logdat = np.log10(dataarr.value)
-    img = ax1.imshow(logdat,vmin=vmin,origin='lower',cmap=cmap)
+    img = ax1.imshow(logdat,vmin=vmin,vmax=vmax,origin='lower',cmap=cmap)
 
     ax1.patch.set_facecolor(cmap(0.)) # sets background color to lowest color map value
 
@@ -86,3 +83,41 @@ def write_fits(datadict,outfile,units='ph'):
     outf = open(outfile,'wb')
     hlist.writeto(outf)
     outf.close()
+
+def load_foggie(filename, line='Lyalpha', orientation='edge-on', redshift='0.0'):
+    
+    ff = h5py.File(filename, 'r')
+    grid = ff['z='+redshift]
+    print('Opening FOGGIE halo name:',grid.attrs['halo_name'])
+    print("Groups and datasets in the HDF5 file:")
+    print('FOGGIE redshift snapshots:',list(ff.keys()))
+    print('')
+        
+    print('Metadata keys included:')
+    print(grid.attrs.keys())
+    print('')
+    
+    print('Data included:')
+    print(grid.keys())
+    print('')
+    
+    print('data grid extent:', grid.attrs['image_extent_kpc'],'kpc')
+
+    if 'edge' in orientation:
+        griddata = grid[line+'_emission_edge'][()]
+    elif 'face' in orientation:
+        griddata = grid[line+'_emission_face'][()]
+
+    print('physical scale per pixel:',  grid.attrs['image_extent_kpc']/np.shape(griddata)[0],'kpc')    
+    print('')
+
+    data_ph = griddata * u.ph * 1/u.s * 1/u.cm**2 * 1/u.arcsec**2 / 4.25e10
+    photon_wavelength = hcu.get_restwave(line)
+    
+    data_ph = griddata * u.ph * 1/u.s * 1/u.cm**2 * 1/u.arcsec**2 / 4.25e10
+    data_cgs = data_ph * const.h.to('erg s') * const.c.to(u.AA/u.s) /photon_wavelength/u.ph
+    
+    datadict = {'data_ph':data_ph, 'data_cgs':data_cgs, 'line': line,
+            'restwave': photon_wavelength}
+    return datadict
+
