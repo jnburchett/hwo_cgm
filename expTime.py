@@ -140,7 +140,8 @@ class Map(object):
         return snr_map
     
 def make_sn_map(sndata,map,line='Lya',cmap=cm.inferno,vmin=0,vmax=5,
-            extent=100.*u.kpc,axislabels='distance',numticks=5,log=False):
+            extent=100.*u.kpc,axislabels='distance',numticks=5,log=False,
+            ang_scale=None):
 
     fig, ax1 = plt.subplots(1, 1, figsize=(11.5, 10))
     fig.subplots_adjust(bottom=0.1,top=0.95,left=0.1)
@@ -158,6 +159,20 @@ def make_sn_map(sndata,map,line='Lya',cmap=cm.inferno,vmin=0,vmax=5,
     cax = div.append_axes("right",size="5%",pad=0.1)
     cbar = plt.colorbar(img, cax=cax,orientation='vertical')
 
+    if ang_scale is not None:
+        linesize = ang_scale/map.final_res
+        linesize = linesize.to(map_bin**(0.5)).value
+        numpix = sndata.shape[0]
+        ax1.hlines(0.9*numpix,0.1*numpix,0.1*numpix+linesize,color='white',linewidth=8)
+        if ang_scale.unit == u.arcsec:
+            upart = '"'
+        elif ang_scale.unit == u.arcmin:
+            upart = '\''
+        sclabel = '{}{} @ z={}'.format(ang_scale.value,upart,map.redshift)
+        print(sclabel)
+        ax1.text(0.1*numpix,0.92*numpix,sclabel,color='white',fontsize='medium',
+                 fontweight='semibold')
+
     if 'distance' in axislabels:
         distunit = extent.unit
         extent=extent.value
@@ -173,6 +188,7 @@ def make_sn_map(sndata,map,line='Lya',cmap=cm.inferno,vmin=0,vmax=5,
         ax1.set_yticklabels(ylabels)
         ax1.set_xlabel(distunit); ax1.set_ylabel(distunit)
 
+    
     if log:
         logpart = 'log$_{10}$ '
     else:
